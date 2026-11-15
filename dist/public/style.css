@@ -1,0 +1,14 @@
+.cftunnel-dialog .cft { display: flex; flex-direction: column; gap: .8em; min-width: min(30em, 80vw); }
+.cft-status { display: flex; align-items: center; gap: .5em; font-weight: bold; }
+.cft-status .dot { width: .7em; height: .7em; border-radius: 50%; background: #888; }
+.cft-status.online .dot { background: #2fbf71; }
+.cft-status.starting .dot, .cft-status.downloading .dot, .cft-status.retrying .dot { background: #e6a700; }
+.cft-status.error .dot { background: #e5484d; }
+.cft-url { display: flex; gap: .5em; align-items: center; padding: .6em .8em; border: 1px solid #8884; border-radius: .5em; }
+.cft-url a { flex: 1; word-break: break-all; font-family: monospace; font-size: 1.05em; }
+.cft-hint, .cft-meta { opacity: .75; font-size: .9em; }
+.cft-error { color: #e5484d; font-size: .9em; word-break: break-word; }
+.cft-actions { display: flex; gap: .5em; flex-wrap: wrap; }
+.cft-actions .primary { font-weight: bold; }
+.cft-warn { font-size: .85em; padding: .6em .8em; border-radius: .5em; background: #e6a70022; }
+.cft-log pre { max-height: 14em; overflow: auto; font-size: .8em; white-space: pre-wrap; margin: .4em 0 0; }
