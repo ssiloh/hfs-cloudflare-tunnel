@@ -12,3 +12,5 @@
 .cft-actions .primary { font-weight: bold; }
 .cft-warn { font-size: .85em; padding: .6em .8em; border-radius: .5em; background: #e6a70022; }
 .cft-log pre { max-height: 14em; overflow: auto; font-size: .8em; white-space: pre-wrap; margin: .4em 0 0; }
+.cft-menu { display: inline-flex; gap: 2px; }
+.cft-menu.online button:first-child { font-family: monospace; font-size: .8em; white-space: nowrap; }

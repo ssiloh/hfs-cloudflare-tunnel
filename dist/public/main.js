@@ -7,15 +7,39 @@
         start: '터널 시작', stop: '중지', restart: '새 주소로 다시 시작', copy: '복사', copied: '주소를 복사했습니다', open: '열기',
         waiting: '주소를 받는 중입니다…', none: '터널을 시작하면 https://….trycloudflare.com 주소가 생깁니다.',
         warn: '이 주소를 아는 사람은 누구나 인터넷에서 이 HFS에 접속할 수 있습니다. 공유 폴더의 권한을 확인하세요. 주소는 터널을 다시 시작할 때마다 바뀝니다.',
-        target: '연결 대상', log: '기록', since: '연결 시각',
+        target: '연결 대상', log: '기록', since: '연결 시각', newUrl: '터널 주소가 생겼습니다: ', copyTip: '주소 복사',
     } : {
         button: 'Tunnel', tooltip: 'Cloudflare Quick Tunnel', title: 'Cloudflare Quick Tunnel',
         status: { stopped: 'Off', starting: 'Starting…', downloading: 'Downloading cloudflared…', online: 'Online', retrying: 'Reconnecting…', error: 'Error' },
         start: 'Start tunnel', stop: 'Stop', restart: 'Restart with a new address', copy: 'Copy', copied: 'Address copied', open: 'Open',
         waiting: 'Waiting for the address…', none: 'Start the tunnel to get an https://….trycloudflare.com address.',
         warn: 'Anyone who knows this address can reach this HFS from the internet. Check the permissions of your shared folders. The address changes on every restart.',
-        target: 'Target', log: 'Log', since: 'Online since',
+        target: 'Target', log: 'Log', since: 'Online since', newUrl: 'Tunnel address: ', copyTip: 'Copy address',
     }
+
+    // shared status, polled while an admin has the page open: fast while connecting, slow otherwise
+    const store = { s: null, subs: new Set(), timer: 0, lastUrl: '' }
+    function poll() {
+        clearTimeout(store.timer)
+        HFS.customRestCall('cftunnel_status').then(s => {
+            const fresh = s.url && s.url !== store.lastUrl
+            store.lastUrl = s.url || ''
+            store.s = s
+            store.subs.forEach(f => f(s))
+            if (fresh) {
+                HFS.toast(T.newUrl + s.url, 'success')
+                if (document.querySelector('.cftunnel-dialog')) navigator.clipboard?.writeText(s.url).catch(() => {})
+            }
+            const busy = ['starting', 'downloading', 'retrying'].includes(s.status)
+            store.timer = setTimeout(poll, busy ? 1500 : 8000)
+        }, () => { store.timer = setTimeout(poll, 15000) })
+    }
+    function useTunnel() {
+        const [s, setS] = React.useState(store.s)
+        React.useEffect(() => { store.subs.add(setS); return () => store.subs.delete(setS) }, [])
+        return s
+    }
+    const shortUrl = u => u.replace(/^https:\/\//, '')
 
     HFS.onEvent('appendMenuBar', () => h(MenuButton))
 
@@ -23,10 +47,22 @@
         const { username } = HFS.useSnapState()
         const [ok, setOk] = React.useState(false)
         React.useEffect(() => {
-            HFS.customRestCall('cftunnel_allowed').then(r => setOk(!!r?.ok), () => setOk(false))
+            HFS.customRestCall('cftunnel_allowed').then(r => {
+                setOk(!!r?.ok)
+                if (r?.ok) poll(); else clearTimeout(store.timer)
+            }, () => setOk(false))
         }, [username])
+        const s = useTunnel()
         if (!ok) return null
-        return h(HFS.Btn, { icon: '☁️', label: T.button, tooltip: T.tooltip, onClick: open })
+        const online = s?.url
+        const copy = e => {
+            e.stopPropagation()
+            navigator.clipboard.writeText(s.url).then(() => HFS.toast(T.copied, 'success'))
+        }
+        return h('span', { className: 'cft-menu' + (online ? ' online' : '') },
+            h(HFS.Btn, { icon: '☁️', label: online ? shortUrl(s.url) : T.button + (s && s.status !== 'stopped' ? ' · ' + (T.status[s.status] || '') : ''),
+                tooltip: online ? s.url : T.tooltip, onClick: open }),
+            online ? h(HFS.Btn, { icon: '📋', label: '', tooltip: T.copyTip, onClick: copy }) : null)
     }
 
     function open() {
@@ -34,18 +70,12 @@
     }
 
     function Content() {
-        const [s, setS] = React.useState(null)
+        const s = useTunnel()
         const [busy, setBusy] = React.useState(false)
-        React.useEffect(() => {
-            let alive = true
-            const tick = () => HFS.customRestCall('cftunnel_status').then(r => alive && setS(r), () => {})
-            tick()
-            const t = setInterval(tick, 1500)
-            return () => { alive = false; clearInterval(t) }
-        }, [])
+        React.useEffect(() => { poll() }, [])
         const act = name => {
             setBusy(true)
-            HFS.customRestCall('cftunnel_' + name).then(setS, e => HFS.toast(String(e?.message || e), 'error')).finally(() => setBusy(false))
+            HFS.customRestCall('cftunnel_' + name).then(() => poll(), e => HFS.toast(String(e?.message || e), 'error')).finally(() => setBusy(false))
         }
         if (!s) return h('div', { className: 'cft' }, '…')
         const running = ['starting', 'downloading', 'online', 'retrying'].includes(s.status)
